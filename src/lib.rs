@@ -114,7 +114,7 @@ impl Probe {
                         Some(m) => m,
                         None => {
                             if websocket.is_terminated() {
-                                eprintln!("{}", "Connection terminated".color(Color::Orange1));
+                                eprintln!("\n{}", "Connection terminated".color(Color::Orange1));
                             }
                             break;
                         }
@@ -153,30 +153,34 @@ impl Probe {
                 let relay_message: RelayMessage = serde_json::from_str(&s)?;
                 match relay_message {
                     RelayMessage::Auth(challenge) => {
-                        eprintln!("{}: AUTH({})", PREFIXES.from_relay, challenge);
+                        eprintln!("{}: \nAUTH({})", PREFIXES.from_relay, challenge);
                     }
                     RelayMessage::Event(sub, e) => {
                         let event_json = serde_json::to_string(&e)?;
                         eprintln!(
-                            "{}: EVENT({}, {})",
-                            PREFIXES.from_relay,
-                            sub.as_str(),
+                            //"{}: \n[EVENT({}, {})]",
+                            //PREFIXES.from_relay,
+                            //"\n[EVENT({}, {})]",
+                            //sub.as_str(),
+                            "\n{}",
+                            //sub.as_str(),
                             event_json
                         );
                     }
                     RelayMessage::Closed(sub, msg) => {
-                        eprintln!("{}: CLOSED({}, {})", PREFIXES.from_relay, sub.as_str(), msg);
+                        //eprintln!("{}: \nCLOSED({}, {})", PREFIXES.from_relay, sub.as_str(), msg);
                     }
                     RelayMessage::Notice(s) => {
-                        eprintln!("{}: NOTICE({})", PREFIXES.from_relay, s);
+                        //eprintln!("{}: \nNOTICE({})", PREFIXES.from_relay, s);
                     }
                     RelayMessage::Eose(sub) => {
-                        eprintln!("{}: EOSE({})", PREFIXES.from_relay, sub.as_str());
+                        //eprintln!("{}: \nEOSE({})", PREFIXES.from_relay, sub.as_str());
                     }
                     RelayMessage::Ok(id, ok, reason) => {
                         eprintln!(
-                            "{}: OK({}, {}, {})",
-                            PREFIXES.from_relay,
+                            //"{}: \nOK({}, {}, {})",
+                            //PREFIXES.from_relay,
+                            "\nOK({}, {}, {})",
                             id.as_hex_string(),
                             ok,
                             reason
@@ -185,13 +189,13 @@ impl Probe {
                 }
             }
             Message::Binary(_) => {
-                eprintln!("{}: Binary message received!!!", PREFIXES.from_relay);
+                //eprintln!("{}: \nBinary message received!!!", PREFIXES.from_relay);
             }
             Message::Ping(_) => {
-                eprintln!("{}: Ping", PREFIXES.from_relay);
+                //eprintln!("{}: \nPing", PREFIXES.from_relay);
             }
             Message::Pong(_) => {
-                eprintln!("{}: Pong", PREFIXES.from_relay);
+                //eprintln!("{}: \nPong", PREFIXES.from_relay);
             }
             Message::Close(_) => {
                 eprintln!("{}", "Remote closed nicely.".color(Color::Green));
@@ -210,12 +214,12 @@ impl Probe {
         message: Message,
     ) -> Result<(), Box<dyn std::error::Error>> {
         match message {
-            Message::Text(ref s) => eprintln!("{}: Text({})", PREFIXES.sending, s),
-            Message::Binary(_) => eprintln!("{}: Binary(_)", PREFIXES.sending),
-            Message::Ping(_) => eprintln!("{}: Ping(_)", PREFIXES.sending),
-            Message::Pong(_) => eprintln!("{}: Pong(_)", PREFIXES.sending),
-            Message::Close(_) => eprintln!("{}: Close(_)", PREFIXES.sending),
-            Message::Frame(_) => eprintln!("{}: Frame(_)", PREFIXES.sending),
+            Message::Text(ref s) => eprintln!("{}: \nText({})", PREFIXES.sending, s),
+            Message::Binary(_) => eprintln!("{}: \nBinary(_)", PREFIXES.sending),
+            Message::Ping(_) => eprintln!("{}: \nPing(_)", PREFIXES.sending),
+            Message::Pong(_) => eprintln!("{}: \nPong(_)", PREFIXES.sending),
+            Message::Close(_) => eprintln!("{}: \nClose(_)", PREFIXES.sending),
+            Message::Frame(_) => eprintln!("{}: \nFrame(_)", PREFIXES.sending),
         }
         Ok(websocket.send(message).await?)
     }
@@ -307,7 +311,7 @@ pub async fn req(
             }
             RelayMessage::Event(sub, e) => {
                 if sub == our_sub_id {
-                    println!("{}", serde_json::to_string(&e)?);
+                    print!("\n{}\n", serde_json::to_string(&e)?);
                 }
             }
             RelayMessage::Closed(sub, _) => {
