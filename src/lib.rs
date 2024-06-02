@@ -220,7 +220,7 @@ impl Probe {
             Message::Binary(_) => eprintln!("{}: \nBinary(_)", PREFIXES.sending),
             Message::Ping(_) => eprintln!("{}: \nPing(_)", PREFIXES.sending),
             Message::Pong(_) => eprintln!("{}: \nPong(_)", PREFIXES.sending),
-            Message::Close(_) => eprintln!("{}: \nClose(_)", PREFIXES.sending),
+            Message::Close(_) => eprintln!(""),//eprintln!("{}: \nClose(_)", PREFIXES.sending),
             Message::Frame(_) => eprintln!("{}: \nFrame(_)", PREFIXES.sending),
         }
         Ok(websocket.send(message).await?)

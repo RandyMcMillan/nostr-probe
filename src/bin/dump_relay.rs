@@ -37,7 +37,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             RelayMessage::Event(sub, e) => {
                 if sub == our_sub_id {
-                    print!("\n{}\n", serde_json::to_string(&e)?);
+                    print!("\n{}", serde_json::to_string(&e)?);
                 }
             }
             RelayMessage::Closed(sub, _) => {
