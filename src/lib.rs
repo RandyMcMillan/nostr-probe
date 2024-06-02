@@ -180,10 +180,12 @@ impl Probe {
                         eprintln!(
                             //"{}: \nOK({}, {}, {})",
                             //PREFIXES.from_relay,
-                            "\nOK({}, {}, {})",
+                            //"\nOK({}, {}, {})",
+                            //id.as_hex_string(),
+                            //ok,
+                            //reason
+                            "\nOK({})",
                             id.as_hex_string(),
-                            ok,
-                            reason
                         );
                     }
                 }
@@ -198,7 +200,7 @@ impl Probe {
                 //eprintln!("{}: \nPong", PREFIXES.from_relay);
             }
             Message::Close(_) => {
-                eprintln!("{}", "Remote closed nicely.".color(Color::Green));
+                //eprintln!("{}", "Remote closed nicely.".color(Color::Green));
             }
             Message::Frame(_) => {
                 unreachable!()
