@@ -13,12 +13,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let filter = Filter::new();
 
-    let (to_probe, from_main) = tokio::sync::mpsc::channel::<Command>(100);
-    let (to_main, mut from_probe) = tokio::sync::mpsc::channel::<RelayMessage>(100);
+    let (to_probe, from_main) = tokio::sync::mpsc::channel::<Command>(10);
+    let (to_main, mut from_probe) = tokio::sync::mpsc::channel::<RelayMessage>(10);
     let join_handle = tokio::spawn(async move {
         let mut probe = Probe::new(from_main, to_main);
         if let Err(e) = probe.connect_and_listen(&relay_url).await {
-            eprintln!("{}", e);
+            eprintln!("\n{}", e);
         }
     });
 
@@ -37,7 +37,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             RelayMessage::Event(sub, e) => {
                 if sub == our_sub_id {
-                    println!("{}", serde_json::to_string(&e)?);
+                    print!("\n{}\n", serde_json::to_string(&e)?);
                 }
             }
             RelayMessage::Closed(sub, _) => {
