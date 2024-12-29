@@ -1,5 +1,5 @@
 use nostr_probe::{Command, Probe};
-use nostr_types::{EventKind, Filter, PublicKey, RelayMessage, SubscriptionId};
+use nostr_types::{Filter, RelayMessage, SubscriptionId};
 use std::env;
 
 #[tokio::main]
@@ -8,11 +8,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let _ = args.next(); // program name
     let relay_url = match args.next() {
         Some(u) => u,
-        None => panic!("Usage: fetch_relay_list <RelayURL> <PubKeyHex>"),
+        None => panic!("Usage: fetch_by_filter <RelayURL> <FilterJSON>"),
     };
-    let pubkey: PublicKey = match args.next() {
-        Some(id) => PublicKey::try_from_hex_string(&id, true)?,
-        None => panic!("Usage: fetch_relay_list <RelayURL> <PubKeyHex>"),
+    let filter: Filter = match args.next() {
+        Some(filter) => match serde_json::from_str(&filter) {
+            Ok(f) => f,
+            Err(e) => panic!("{}", e),
+        },
+        None => panic!("Usage: fetch_by_filter <RelayURL> <FilterJSON>"),
     };
 
     let (to_probe, from_main) = tokio::sync::mpsc::channel::<Command>(100);
@@ -24,14 +27,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     });
 
-    let our_sub_id = SubscriptionId("fetch_relay_list".to_string());
-    let mut filter = Filter::new();
-    filter.add_author(pubkey);
-    filter.add_event_kind(EventKind::RelayList);
-    filter.limit = Some(1);
-
+    let our_sub_id = SubscriptionId("count_by_filter".to_string());
     to_probe
-        .send(Command::FetchEvents(our_sub_id.clone(), vec![filter]))
+        .send(Command::CountEvents(our_sub_id.clone(), vec![filter]))
         .await?;
 
     loop {
@@ -45,6 +43,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             RelayMessage::Event(sub, e) => {
                 if sub == our_sub_id {
                     println!("{}", serde_json::to_string(&e)?);
+                }
+            }
+            RelayMessage::Count(sub, result) => {
+                if sub == our_sub_id {
+                    println!("{}", serde_json::to_string(&result)?);
                 }
             }
             RelayMessage::Closed(sub, _) => {

@@ -1,12 +1,21 @@
 use nostr_probe::{Command, Probe};
 use nostr_types::{
-    EventKind, Filter, IdHex, KeySigner, PreEvent, PrivateKey, RelayMessage, Signer,
-    SubscriptionId, Unixtime,
+    EventKind, Filter, KeySigner, PreEvent, PrivateKey, RelayMessage, Signer, SubscriptionId,
+    Unixtime,
 };
 use std::env;
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+async fn main() {
+    if let Err(e) = inner().await {
+        eprintln!("{}", e);
+    }
+
+    eprintln!("FAILED ON ERROR");
+    std::process::exit(1);
+}
+
+async fn inner() -> Result<(), Box<dyn std::error::Error>> {
     let mut args = env::args();
     let _ = args.next(); // program name
     let relay_url = match args.next() {
@@ -15,7 +24,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     // Create a new identity
-    eprintln!("Generating keypair...");
+    // eprintln!("Generating keypair...");
     let private_key = PrivateKey::generate();
     let public_key = private_key.public_key();
     let signer = KeySigner::from_private_key(private_key, "pass", 16).unwrap();
@@ -23,7 +32,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Create an event for testing the relay
     let pre_event = PreEvent {
         pubkey: public_key,
-        created_at: Unixtime::now().unwrap(),
+        created_at: Unixtime::now(),
         kind: EventKind::TextNote,
         content: "Hello. This is a test to see if this relay accepts notes from new people. \
                   This is from an ephemeral keypair, and this note can be ignored or deleted."
@@ -43,20 +52,24 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     });
 
-    let id: IdHex = event.id.into();
-
     to_probe.send(Command::PostEvent(event.clone())).await?;
 
     loop {
         match from_probe.recv().await.unwrap() {
-            RelayMessage::Ok(id, _, _) => {
+            RelayMessage::Ok(id, success, message) => {
                 if id == event.id {
+                    if !success {
+                        eprintln!("FAILED: {}", message);
+                        std::process::exit(1);
+                    }
                     break;
                 }
             }
-            RelayMessage::Notice(_) => {
-                to_probe.send(Command::Exit).await?;
-                return Ok(join_handle.await?);
+            RelayMessage::Notice(notice) => {
+                eprintln!("FAILED ON NOTICE: {}", notice);
+                std::process::exit(1);
+                //to_probe.send(Command::Exit).await?;
+                //return Ok(join_handle.await?);
             }
             _ => {}
         }
@@ -64,7 +77,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let our_sub_id = SubscriptionId("fetch_by_id".to_string());
     let mut filter = Filter::new();
-    filter.add_id(&id);
+    filter.add_id(event.id);
     to_probe
         .send(Command::FetchEvents(our_sub_id.clone(), vec![filter]))
         .await?;
@@ -85,8 +98,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             RelayMessage::Event(subid, e) => {
                 if subid == our_sub_id && e.id == event.id {
-                    to_probe.send(Command::Exit).await?;
-                    break;
+                    eprintln!("SUCCESS - THIS IS AN OPEN RELAY");
+                    std::process::exit(0);
+                    //to_probe.send(Command::Exit).await?;
+                    //break;
                 }
             }
             RelayMessage::Notice(_) => {
@@ -97,5 +112,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    Ok(join_handle.await?)
+    join_handle.await?;
+
+    Ok(())
 }

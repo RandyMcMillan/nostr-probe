@@ -31,6 +31,7 @@ pub enum Command {
     PostEvent(Event),
     Auth(Event),
     FetchEvents(SubscriptionId, Vec<Filter>),
+    CountEvents(SubscriptionId, Vec<Filter>),
     Exit,
 }
 
@@ -51,6 +52,14 @@ impl Probe {
         &mut self,
         relay_url: &str,
     ) -> Result<(), Box<dyn std::error::Error>> {
+        self.connect_and_listen_with_timeout(relay_url, 15).await
+    }
+
+    pub async fn connect_and_listen_with_timeout(
+        &mut self,
+        relay_url: &str,
+        timeout_secs: u64,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let (host, uri) = url_to_host_and_uri(relay_url);
 
         let key: [u8; 16] = rand::random();
@@ -68,20 +77,19 @@ impl Probe {
             .body(())?;
 
         let (mut websocket, _response) = tokio::time::timeout(
-            std::time::Duration::new(5, 0),
+            std::time::Duration::new(timeout_secs, 0),
             tokio_tungstenite::connect_async(request),
         )
         .await??;
 
-        let mut ping_timer = tokio::time::interval(std::time::Duration::new(15, 0));
-        ping_timer.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
-        ping_timer.tick().await; // use up the first immediate tick.
+        let mut timeout_timer = tokio::time::interval(std::time::Duration::new(timeout_secs, 0));
+        timeout_timer.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+        timeout_timer.tick().await; // use up the first immediate tick.
 
         loop {
             tokio::select! {
-                _ = ping_timer.tick() => {
-                    let msg = Message::Ping(vec![0x1]);
-                    self.send(&mut websocket, msg).await?;
+                _ = timeout_timer.tick() => {
+                    return Ok(()); // timed out
                 },
                 local_message = self.from_main.recv() => {
                     match local_message {
@@ -99,6 +107,12 @@ impl Probe {
                         },
                         Some(Command::FetchEvents(subid, filters)) => {
                             let client_message = ClientMessage::Req(subid, filters);
+                            let wire = serde_json::to_string(&client_message)?;
+                            let msg = Message::Text(wire);
+                            self.send(&mut websocket, msg).await?;
+                        },
+                        Some(Command::CountEvents(subid, filters)) => {
+                            let client_message = ClientMessage::Count(subid, filters);
                             let wire = serde_json::to_string(&client_message)?;
                             let msg = Message::Text(wire);
                             self.send(&mut websocket, msg).await?;
@@ -173,8 +187,19 @@ impl Probe {
                     RelayMessage::Notice(s) => {
                         //eprintln!("{}: \nNOTICE({})", PREFIXES.from_relay, s);
                     }
+                    RelayMessage::Notify(s) => {
+                        eprintln!("{}: NOTIFY({})", PREFIXES.from_relay, s);
+                    }
                     RelayMessage::Eose(sub) => {
                         //eprintln!("{}: \nEOSE({})", PREFIXES.from_relay, sub.as_str());
+                    }
+                    RelayMessage::Count(sub, result) => {
+                        eprintln!(
+                            "{}: COUNT({},{:?})",
+                            PREFIXES.from_relay,
+                            sub.as_str(),
+                            result
+                        );
                     }
                     RelayMessage::Ok(id, ok, reason) => {
                         eprintln!(
@@ -278,7 +303,7 @@ pub async fn req(
     let pubkey = signer.public_key();
     let mut authenticated: Option<Id> = None;
 
-    let our_sub_id = SubscriptionId("fetch_by_kind_and_author".to_string());
+    let our_sub_id = SubscriptionId("subscription-id".to_string());
     to_probe
         .send(Command::FetchEvents(
             our_sub_id.clone(),
@@ -293,7 +318,7 @@ pub async fn req(
             RelayMessage::Auth(challenge) => {
                 let pre_event = PreEvent {
                     pubkey,
-                    created_at: Unixtime::now().unwrap(),
+                    created_at: Unixtime::now(),
                     kind: EventKind::Auth,
                     tags: vec![
                         Tag::new(&["relay", relay_url]),
@@ -333,9 +358,13 @@ pub async fn req(
                     }
                 }
             }
+            RelayMessage::Count(_, _) => {}
             RelayMessage::Notice(_) => {
                 to_probe.send(Command::Exit).await?;
                 break;
+            }
+            RelayMessage::Notify(m) => {
+                eprintln!("NOTIFY: {m}");
             }
             RelayMessage::Ok(id, is_ok, reason) => {
                 if let Some(authid) = authenticated {

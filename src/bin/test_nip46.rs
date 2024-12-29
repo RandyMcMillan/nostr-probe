@@ -95,7 +95,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Subscribe to nostr-connect events from our peer on this relay
     let our_sub_id = SubscriptionId("test_nip46".to_string());
     let mut filter = Filter::new();
-    filter.add_author(&remote_pubkey.into());
+    filter.add_author(remote_pubkey);
     filter.add_event_kind(EventKind::NostrConnect);
     filter.add_tag_value('p', ephemeral_public_key.as_hex_string());
     to_probe
@@ -126,7 +126,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         let pre_event = PreEvent {
             pubkey: ephemeral_public_key,
-            created_at: Unixtime::now().unwrap(),
+            created_at: Unixtime::now(),
             kind: EventKind::NostrConnect,
             content: encrypted_content,
             tags: vec![Tag::new(&["p", &remote_pubkey.as_hex_string()])],
@@ -177,7 +177,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Create a pre-event for the nip46 server to sign
     let pre_event = PreEvent {
         pubkey: remote_pubkey,
-        created_at: Unixtime::now().unwrap(),
+        created_at: Unixtime::now(),
         kind: EventKind::TextNote,
         content: "This is a test".to_owned(),
         tags: vec![],
@@ -204,7 +204,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         let pre_event = PreEvent {
             pubkey: ephemeral_public_key,
-            created_at: Unixtime::now().unwrap(),
+            created_at: Unixtime::now(),
             kind: EventKind::NostrConnect,
             content: encrypted_content,
             tags: vec![Tag::new(&["p", &remote_pubkey.as_hex_string()])],
